@@ -1,147 +1,161 @@
+import os
 import requests
-import time
-from bs4 import BeautifulSoup
+from datetime import datetime
+import pytz
 
-# ==============================================================================
+# ==========================================
 # CONFIGURACIÓN DE CREDENCIALES
-# ==============================================================================
-TELEGRAM_TOKEN = "8770103112:AAE3wFvgeCGUEKV_atHJ2tOMztsRm2cyBAQ"
-CHAT_ID = "6622432626"
+# ==========================================
+# Puedes colocarlos directamente entre comillas o usar variables de entorno
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "TU_TELEGRAM_TOKEN_AQUI")
+CHAT_ID = os.getenv("CHAT_ID", "TU_CHAT_ID_AQUI")
 
-# Filtros estrictos de calidad para las alertas
-MIN_EV_PORCENTAJE = 5.0      # Mínimo +5% de valor esperado (Error de la casa)
-MIN_PROBABILIDAD = 60.0      # Mínimo 60% de probabilidad estimada de acierto
+# ==========================================
+# CONFIGURACIÓN HORARIA (VENEZUELA)
+# ==========================================
+tz_ve = pytz.timezone("America/Caracas")
+fecha_hoy_ve = datetime.now(tz_ve).strftime("%Y-%m-%d")
 
-# ==============================================================================
-# MÓDULO 1: ENVÍO DE ALERTAS A TELEGRAM
-# ==============================================================================
 def enviar_alerta_telegram(mensaje):
+    """Envia mensaje formateado a Telegram."""
+    if TELEGRAM_TOKEN == "TU_TELEGRAM_TOKEN_AQUI" or not TELEGRAM_TOKEN:
+        print("⚠️ TOKEN de Telegram no configurado.")
+        print(mensaje)
+        return
+    
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
         "chat_id": CHAT_ID,
         "text": mensaje,
-        "parse_mode": "HTML"
+        "parse_mode": "Markdown"
     }
     try:
-        res = requests.post(url, data=payload, timeout=12)
-        return res.status_code == 200
+        res = requests.post(url, json=payload, timeout=10)
+        if res.status_code == 200:
+            print("✅ Alerta enviada a Telegram con éxito.")
+        else:
+            print(f"❌ Error al enviar mensaje: {res.status_code} - {res.text}")
     except Exception as e:
-        print(f"Error de red al enviar a Telegram: {e}")
-        return False
+        print(f"❌ Excepción enviando a Telegram: {e}")
 
-# ==============================================================================
-# MÓDULO 2: MOTOR MATEMÁTICO MULTI-MERCADO
-# ==============================================================================
-def evaluar_mercado(partido, liga, mercado, seleccion, prob_estimada, cuota_triunfobet):
+def obtener_partidos_del_dia():
     """
-    Calcula la cuota justa y el EV% para cualquier mercado y selección.
+    Realiza una petición en vivo a Triunfobet forzando la fecha
+    actual de Venezuela y usando encabezados anti-caché.
     """
-    if prob_estimada <= 0 or cuota_triunfobet <= 1.0:
-        return
-
-    p_decimal = prob_estimada / 100.0
-    cuota_justa = 1.0 / p_decimal
-    ev = ((p_decimal * cuota_triunfobet) - 1.0) * 100.0
-
-    # Criterio estricto: Alta probabilidad AND Alto Valor Esperado
-    if ev >= MIN_EV_PORCENTAJE and prob_estimada >= MIN_PROBABILIDAD:
-        mensaje = (
-            f"🔥 **¡VALUE BET DETECTADO EN TRIUNFOBET!** 🔥\n\n"
-            f"⚽ **Partido:** {partido}\n"
-            f"🏆 **Liga:** {liga}\n"
-            f"🎯 **Mercado:** {mercado}\n"
-            f"📌 **Pronóstico:** {seleccion}\n\n"
-            f"📈 **Probabilidad Estimada:** {prob_estimada:.1f}%\n"
-            f"⚖️ **Cuota Justa Teórica:** {cuota_justa:.2f}\n"
-            f"🎰 **Cuota en Triunfobet:** {cuota_triunfobet:.2f}\n\n"
-            f"💰 **Ventaja Esperada (EV):** +{ev:.2f}%\n"
-            f"⚡ *Recomendación: Oportunidad de alto valor y alta probabilidad.*"
-        )
-        print(f"  [+] Oportunidad encontrada: {partido} | {seleccion} @ {cuota_triunfobet} (EV: +{ev:.2f}%)")
-        enviar_alerta_telegram(mensaje)
-        time.sleep(1) # Evita saturar la API de Telegram
-
-# ==============================================================================
-# MÓDULO 3: ESCÁNER MASIVO DE TRIUNFOBET & PARRILLA COMPLETA
-# ==============================================================================
-def escanear_jornada_completa():
-    print("==========================================================")
-    print("🚀 INICIANDO ESCANEO MASIVO DE TRIUNFOBET (TODOS LOS MERCADOS)")
-    print("==========================================================")
-
     headers = {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10; Tablet) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
-        "Accept": "application/json, text/plain, */*"
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
     }
+    
+    # Parámetro de tiempo dinámico (?t=...) para obligar recarga en vivo
+    timestamp_actual = datetime.now().timestamp()
+    url = f"https://triunfobet.com/api/partidos?fecha={fecha_hoy_ve}&t={timestamp_actual}"
+    
+    print(f"🔄 Consultando partidos de hoy ({fecha_hoy_ve}) en Triunfobet...")
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code == 200:
+            datos = response.json()
+            # Ajustar la clave según la respuesta exacta de la API de Triunfobet
+            partidos = datos.get("data", datos.get("partidos", []))
+            print(f"📊 Se encontraron {len(partidos)} partidos para el día de hoy.")
+            return partidos
+        else:
+            print(f"⚠️ Error al conectar con Triunfobet: Código HTTP {response.status_code}")
+            return []
+    except Exception as e:
+        print(f"⚠️ Ocurrió una excepción al consultar Triunfobet: {e}")
+        return []
 
-    # --- AHORA (Código corregido con fecha de hoy y anti-caché) ---
-from datetime import datetime
-import requests
+def calcular_ev(probabilidad_estimada, cuota_casa):
+    """
+    Fórmula: EV% = ((Probabilidad * Cuota) - 1) * 100
+    """
+    prob_dec = probabilidad_estimada / 100.0
+    ev = ((prob_dec * cuota_casa) - 1.0) * 100.0
+    return round(ev, 2)
 
-# Forzamos la fecha de hoy para no traer partidos pasados
-fecha_actual = datetime.now().strftime("%Y-%m-%d")
-
-# Encabezados para que Triunfobet responda con la parrilla en vivo y no use memoria guardada
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Cache-Control': 'no-cache, no-store, must-revalidate',
-    'Pragma': 'no-cache',
-    'Expires': '0'
-}
-
-# Añadimos un parámetro de tiempo único (?v=...) para obligar al servidor a responder con cuotas frescas
-url = f"https://triunfobet.com/api/partidos?fecha={fecha_actual}&v={datetime.now().timestamp()}"
-
-response = requests.get(url, headers=headers)
-
-    # 2. Estructura de extracción multi-mercado (Procesa múltiples opciones por partido)
-    # En el servidor, este bloque se conecta con el raspador directo de la API/Página de Triunfobet.
-    jornada_partidos = [
-        {
-            "partido": "Atalanta vs Como",
-            "liga": "Serie A (Italia)",
-            "mercados": [
-                {"mercado": "Ganador 1X2", "seleccion": "Gana Atalanta", "prob": 68.0, "cuota": 1.75},
-                {"mercado": "Ambos Anotan", "seleccion": "Sí", "prob": 62.0, "cuota": 1.90},
-                {"mercado": "Total Goles", "seleccion": "Over 2.5 Goles", "prob": 65.0, "cuota": 1.85},
-            ]
-        },
-        {
-            "partido": "Villarreal vs Las Palmas",
-            "liga": "LaLiga (España)",
-            "mercados": [
-                {"mercado": "Ganador 1X2", "seleccion": "Gana Villarreal", "prob": 65.0, "cuota": 1.80},
-                {"mercado": "Ambos Anotan", "seleccion": "Sí", "prob": 70.0, "cuota": 1.75},
-                {"mercado": "Total Goles", "seleccion": "Over 1.5 Goles", "prob": 82.0, "cuota": 1.35}, # EV bajo, no pasará el filtro
-            ]
-        },
-        {
-            "partido": "Racing Club vs San Lorenzo",
-            "liga": "Liga Profesional (Argentina)",
-            "mercados": [
-                {"mercado": "Ganador 1X2", "seleccion": "Gana Racing", "prob": 55.0, "cuota": 1.65}, # Probabilidad < 60%, se descarta
-                {"mercado": "Doble Oportunidad", "seleccion": "Racing o Empate", "prob": 80.0, "cuota": 1.45},
-            ]
-        }
-    ]
-
-    totales_evaluados = 0
-    for evento in jornada_partidos:
-        partido = evento["partido"]
-        liga = evento["liga"]
+def evaluar_mercados_partido(partido):
+    """
+    Escanea todos los mercados disponibles del partido en búsqueda de Value Bets.
+    Filtro: Probabilidad >= 60% y EV >= +5%.
+    """
+    oportunidades = []
+    
+    # Datos básicos del partido
+    local = partido.get("home_team", "Local")
+    visitante = partido.get("away_team", "Visitante")
+    liga = partido.get("league", "Liga Desconocida")
+    mercados = partido.get("markets", partido.get("mercados", []))
+    
+    for mercado in mercados:
+        nombre_mercado = mercado.get("name", "Mercado Generico")
+        opciones = mercado.get("outcomes", mercado.get("opciones", []))
         
-        for m in evento["mercados"]:
-            totales_evaluados += 1
-            evaluar_mercado(
-                partido=partido,
-                liga=liga,
-                mercado=m["mercado"],
-                seleccion=m["seleccion"],
-                prob_estimada=m["prob"],
-                cuota_triunfobet=m["cuota"]
-            )
+        for opcion in opciones:
+            nombre_apuesta = opcion.get("name", "Opción")
+            cuota = float(opcion.get("price", opcion.get("cuota", 1.0)))
+            
+            # Estimación de probabilidad implícita/analítica
+            # (Se obtiene del sistema o se calcula sobre probabilidad del modelo)
+            prob_estimada = float(opcion.get("probabilidad_estimada", 0.0))
+            
+            # Si la API no la provee directo, usamos cálculo de margen o métrica base
+            if prob_estimada == 0.0 and cuota > 1.0:
+                # Estimación referencial para evaluación de cuota desajustada
+                prob_estimada = (1.0 / cuota) * 100.0
+            
+            ev = calcular_ev(prob_estimada, cuota)
+            
+            # CRITERIOS ESTRICTOS: Probabilidad >= 60% y EV >= 5%
+            if prob_estimada >= 60.0 and ev >= 5.0:
+                cuota_justa = round(100.0 / prob_estimada, 2) if prob_estimada > 0 else 0
+                
+                oportunidad = {
+                    "partido": f"{local} vs {visitante}",
+                    "liga": liga,
+                    "mercado": f"{nombre_mercado} - {nombre_apuesta}",
+                    "probabilidad": prob_estimada,
+                    "cuota_justa": cuota_justa,
+                    "cuota_triunfobet": cuota,
+                    "ev": ev
+                }
+                oportunidades.append(oportunidad)
+                
+    return oportunidades
 
-    print(f"\n✅ Escaneo completado. Se evaluaron {totales_evaluados} mercados en total.")
+def ejecutar_scouting():
+    """Función principal del escáner."""
+    print("🚀 Iniciando escáner diario de Triunfobet...")
+    partidos = obtener_partidos_del_dia()
+    
+    total_value_bets = 0
+    
+    for partido in partidos:
+        hallazgos = evaluar_mercados_partido(partido)
+        for opp in hallazgos:
+            total_value_bets += 1
+            mensaje = (
+                f"🔥 *VALUE BET DETECTADO EN TRIUNFOBET* 🔥\n\n"
+                f"⚽ *Partido:* {opp['partido']}\n"
+                f"🏆 *Liga:* {opp['liga']}\n"
+                f"🎯 *Mercado:* {opp['mercado']}\n\n"
+                f"📈 *Probabilidad Estimada:* {opp['probabilidad']}%\n"
+                f"⚖️ *Cuota Justa Teórica:* {opp['cuota_justa']}\n"
+                f"🎰 *Cuota en Triunfobet:* {opp['cuota_triunfobet']}\n\n"
+                f"💰 *Ventaja Esperada (EV):* +{opp['ev']}%\n"
+                f"⚡ _Triunfobet está pagando por encima del valor real._"
+            )
+            enviar_alerta_telegram(mensaje)
+            
+    if total_value_bets == 0:
+        print("ℹ️ Escaneo completado. No se encontraron apuestas que cumplan los criterios estrictos hoy.")
+        # Opcional: Descomentar si deseas recibir notificación confirmando que se ejecutó sin hallazgos
+        # enviar_alerta_telegram("✅ *Escaneo completado:* No se detectaron errores de cuotas >= 5% EV hoy.")
 
 if __name__ == "__main__":
-    escanear_jornada_completa()
+    ejecutar_scouting()
