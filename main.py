@@ -74,12 +74,25 @@ def escanear_jornada_completa():
         "Accept": "application/json, text/plain, */*"
     }
 
-    # 1. Conexión de prueba a la parrilla general de Triunfobet
-    try:
-        r = requests.get("https://triunfobet.com", headers=headers, timeout=10)
-        print(f"Estado conexión Triunfobet: {r.status_code} OK")
-    except Exception as e:
-        print(f"Error conectando a Triunfobet: {e}")
+    # --- AHORA (Código corregido con fecha de hoy y anti-caché) ---
+from datetime import datetime
+import requests
+
+# Forzamos la fecha de hoy para no traer partidos pasados
+fecha_actual = datetime.now().strftime("%Y-%m-%d")
+
+# Encabezados para que Triunfobet responda con la parrilla en vivo y no use memoria guardada
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
+}
+
+# Añadimos un parámetro de tiempo único (?v=...) para obligar al servidor a responder con cuotas frescas
+url = f"https://triunfobet.com/api/partidos?fecha={fecha_actual}&v={datetime.now().timestamp()}"
+
+response = requests.get(url, headers=headers)
 
     # 2. Estructura de extracción multi-mercado (Procesa múltiples opciones por partido)
     # En el servidor, este bloque se conecta con el raspador directo de la API/Página de Triunfobet.
