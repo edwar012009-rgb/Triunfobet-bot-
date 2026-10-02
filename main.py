@@ -158,4 +158,8 @@ def ejecutar_scouting():
         # enviar_alerta_telegram("✅ *Escaneo completado:* No se detectaron errores de cuotas >= 5% EV hoy.")
 
 if __name__ == "__main__":
-    ejecutar_scouting()
+    ejecutar_scouting
+    if total_value_bets == 0:
+        print("ℹ️ Escaneo completado. No se encontraron apuestas que cumplan los criterios estrictos hoy.")
+        # Quitamos el '#' de la línea de abajo para que SIEMPRE mande reporte a Telegram:
+        enviar_alerta_telegram("✅ *Escaneo de Triunfobet completado:* No se detectaron desajustes de cuotas (>= 5% EV) para los partidos de hoy.")
