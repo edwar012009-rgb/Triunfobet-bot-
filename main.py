@@ -8,8 +8,8 @@ from bs4 import BeautifulSoup
 # CONFIGURACIÓN DE CREDENCIALES
 # ==========================================
 # Si no usas GitHub Secrets, pon tu Token y Chat ID entre las comillas
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8770103112:AAE3wFvgeCGUEKV_atHJ2tOMztsRm2cyBAQ")
-CHAT_ID = os.getenv("CHAT_ID", "6622432626")
+TELEGRAM_TOKEN = os.getenv("8770103112:AAE3wFvgeCGUEKV_atHJ2tOMztsRm2cyBAQ", "8770103112:AAE3wFvgeCGUEKV_atHJ2tOMztsRm2cyBAQ")
+CHAT_ID = os.getenv("6622432626", "6622432626")
 
 # ==========================================
 # CONFIGURACIÓN HORARIA (VENEZUELA)
