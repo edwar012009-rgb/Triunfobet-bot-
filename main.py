@@ -7,8 +7,8 @@ import pytz
 # CONFIGURACIÓN DE CREDENCIALES
 # ==========================================
 # Reemplaza los valores entre comillas si no usas Secrets de GitHub
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "TU_TELEGRAM_TOKEN_AQUI")
-CHAT_ID = os.getenv("CHAT_ID", "TU_CHAT_ID_AQUI")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8770103112:AAE3wFvgeCGUEKV_atHJ2tOMztsRm2cyBAQ")
+CHAT_ID = os.getenv("CHAT_ID", "6622432626")
 
 # ==========================================
 # CONFIGURACIÓN HORARIA (VENEZUELA)
